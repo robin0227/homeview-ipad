@@ -91,6 +91,12 @@ sh build.sh                                    # 生成 dist/HomeView.tipa（需
 - 天气备用数据：[Open-Meteo](https://open-meteo.com/)（CC BY 4.0）
 - 电池管理：[ChargeLimiter](https://github.com/lich4/ChargeLimiter)
 
+## 赞赏支持
+
+如果这个项目帮你省了时间，欢迎扫码请作者喝杯咖啡。完全自愿，不影响任何功能的使用；收款人是本仓库作者个人，与 Apple、Home Assistant 以及致谢中列出的各项目作者无关。
+
+<img src="docs/images/wechat-pay.png" alt="微信赞赏码" width="220">
+
 ## 许可证
 
 [MIT](LICENSE)
