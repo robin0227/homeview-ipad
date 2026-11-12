@@ -12,6 +12,29 @@
 
 > 需要已越狱（Dopamine）并装好 TrollStore 的 iPad，系统为 iPadOS 15。本项目和 Apple 没有任何关系，“HomeView”只是用来描述界面风格。
 
+## 适配设备
+
+> ✅ **目前只在 iPad Air 2（A8X，2 GB 内存，iPadOS 15.8.8，Dopamine 越狱 + TrollStore）上做过完整验证**，包括帧率、HA 延迟、唤醒词、长期插电和夜间调暗。其他设备是按系统要求推算的，还没有实测，欢迎提 Issue 反馈。
+
+**基本要求**
+- 只支持 iPad（`UIDeviceFamily` = iPad），arm64，**iPadOS 15.0 或更高**
+- 能装 **TrollStore**：iPadOS 14.0–16.6.1、16.7 RC、17.0（应用本身不需要越狱，TrollStore 就能安装）
+- 推荐**越狱**（Dopamine，支持 15.0–16.6.1）：`tools/deploy.sh` 要通过 SSH 写入配置和推送网页；电池保护用的 ChargeLimiter 也要在越狱或 TrollStore 环境下运行
+- 局域网里能访问到 Home Assistant
+
+| 设备 | 芯片 | 最高系统 | 状态 |
+| --- | --- | --- | --- |
+| **iPad Air 2** | A8X | iPadOS 15 | ✅ **已验证**：1.25x 渲染 60 fps，滑动 p95 18 ms |
+| iPad mini 4 | A8 | iPadOS 15 | ⚠️ 理论可用，GPU 比 A8X 弱，可能需要把 `render_scale` 调到 1.0 |
+| iPad 第 5 代 | A9 | iPadOS 16 | 🟡 理论可用，未验证 |
+| iPad 第 6 代及更新、Air 3、mini 5 等 | A10 及以上 | iPadOS 17 及以上 | 🟡 理论可用，前提是系统版本还在 TrollStore 支持范围内（≤ 17.0），未验证 |
+| iPad Pro（各代） | A9X 及以上 | — | 🟡 理论可用，性能充足；非 4:3 屏幕会按 4:3 等比居中，未验证 |
+
+**说明**
+- 界面以 1024×768（竖屏时 768×1024）为基准等比缩放，4:3 的 iPad 显示效果最好
+- 性能更强的设备可以把 `config.json` 里的 `render_scale` 调到 1.5–2.0，玻璃效果会更清晰
+- 不支持 iPhone
+
 ## 截图
 
 <table>
