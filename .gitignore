@@ -1,0 +1,12 @@
+.DS_Store
+# local config (has your HA address/entities); the token is never stored in the repo
+app/config.json
+app/web/js/dev-config.js
+app/dist/
+spike/dist/
+spike/.tools/
+spike/vendor/sherpa-onnx/
+spike/vendor/osx/
+spike/models/sherpa-onnx-*/
+spike/results.jsonl
+*.tipa

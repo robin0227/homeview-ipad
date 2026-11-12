@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Glass FPS Bench</title>
+<style>
+:root { --fg: #fff; --bg: #000; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); overflow: hidden;
+  font-family: -apple-system, "PingFang SC", system-ui, sans-serif; -webkit-user-select: none; user-select: none; }
+canvas { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; display: block; }
+#labels { position: fixed; inset: 0; pointer-events: none; }
+.lbl { position: absolute; text-align: center; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+#hud { position: fixed; left: 8px; top: 8px; padding: 6px 10px; border-radius: 10px; background: rgba(0,0,0,.55);
+  font: 12px/1.4 ui-monospace, Menlo, monospace; white-space: pre; z-index: 5; }
+#panel { position: fixed; inset: 0; display: none; z-index: 10; background: rgba(0,0,0,.82); padding: 24px; overflow: auto;
+  font: 14px/1.5 -apple-system, system-ui, sans-serif; }
+#panel table { border-collapse: collapse; margin-top: 12px; }
+#panel td, #panel th { border-bottom: 1px solid #444; padding: 6px 12px; text-align: right; }
+#panel th:first-child, #panel td:first-child { text-align: left; }
+button { font: inherit; padding: 10px 18px; border-radius: 12px; border: 0; background: #0a84ff; color: #fff; margin-top: 16px; }
+</style></head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+<div id="hud">准备中…</div>
+<div id="panel"></div>
+
+<script id="common" type="x-shader">
+precision highp float;
+uniform vec3 tint; uniform float t; uniform float style;
+uniform vec2 res;          /* logical size (CSS px) */
+uniform vec2 view;         /* x: device px per logical px for this target, y: target height in device px */
+vec2 logical() { return vec2(gl_FragCoord.x, view.y - gl_FragCoord.y) / view.x; }
+float flow(vec2 uv) {
+  vec2 q = uv;
+  q += 0.30 * vec2(sin(uv.y * 2.3 + t * 0.21 + 1.3), sin(uv.x * 2.1 - t * 0.17 + 0.4));
+  q += 0.12 * vec2(sin(q.y * 4.7 - t * 0.13 + 2.0), cos(q.x * 3.9 + t * 0.11));
+  float a = sin((q.x * 1.2 + q.y * 1.9) * 4.2);
+  float b = sin((q.x * -1.7 + q.y * 0.8) * 3.1 + 1.7);
+  return 0.65 * a + 0.35 * b;
+}
+vec3 hueShift(vec3 c, float a) {
+  const vec3 k = vec3(0.57735); float ca = cos(a);
+  return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
+}
+vec3 aurora(vec2 p) {
+  vec2 uv = p / res.y;
+  vec3 sky = mix(tint * 0.18 + vec3(0.01, 0.02, 0.05), vec3(0.005, 0.01, 0.03), smoothstep(0.0, 1.0, uv.y));
+  float sway = 0.10 * sin(uv.y * 3.0 + t * 0.22) + 0.04 * sin(uv.y * 8.0 - t * 0.35);
+  float x = uv.x + sway;
+  float rise = smoothstep(1.05, 0.25, uv.y) * smoothstep(-0.05, 0.25, uv.y);
+  float c1 = pow(0.5 + 0.5 * sin(x * 11.0 + t * 0.15), 2.5);
+  float c2 = pow(0.5 + 0.5 * sin(x * 6.5 - t * 0.11 + 1.9), 3.0);
+  float glow = exp(-pow((uv.y - 0.62) * 3.2, 2.0));
+  return sky + mix(tint, vec3(1.0), 0.2) * c1 * rise * 0.75 + hueShift(mix(tint, vec3(1.0), 0.15), 1.1) * c2 * rise * 0.55 + tint * glow * 0.25;
+}
+vec3 bubbles(vec2 p) {
+  vec3 col = mix(tint * 0.30, vec3(0.03), 0.4);
+  float k = res.y / 572.0;
+  for (int i = 0; i < 6; i++) {
+    float f = float(i);
+    vec2 c = res * 0.5 + vec2(res.x * 0.375 * sin(f * 2.4 + t * 0.05 * (1.0 + f * 0.3)), res.y * 0.37 * cos(f * 1.7 + t * 0.04 * (1.0 + f * 0.2)));
+    float r = (150.0 + 45.0 * sin(f * 3.1)) * k;
+    float d = length(p - c) / r;
+    float a = smoothstep(1.0, 0.7, d);
+    vec3 bc = hueShift(mix(tint, vec3(1.0), 0.38), (f - 2.5) * 0.4);
+    col = mix(col, bc * (0.85 + 0.25 * (1.0 - d)), a * 0.62);
+  }
+  return col;
+}
+vec3 liquid(vec2 p) {
+  vec2 uv = p / res.y; float e = 2.0 / res.y;
+  float h = flow(uv);
+  vec2 g = vec2(flow(uv + vec2(e, 0.0)) - h, flow(uv + vec2(0.0, e)) - h) / e;
+  vec3 n = normalize(vec3(-g * 0.10, 1.0));
+  vec3 L = normalize(vec3(-0.45, -0.6, 0.65));
+  float diff = clamp(dot(n, L), 0.0, 1.0);
+  float spec = pow(clamp(dot(reflect(-L, n), vec3(0.0, 0.0, 1.0)), 0.0, 1.0), 18.0);
+  vec3 deep = tint * 0.16 + vec3(0.015); vec3 lit = mix(tint, vec3(1.0), 0.22);
+  float shade = (0.5 + 0.5 * h) * 0.35 + diff * 0.65;
+  vec3 col = mix(deep, lit, shade * shade * (3.0 - 2.0 * shade));
+  col += spec * 0.75 * mix(vec3(1.0), tint, 0.25);
+  float vign = smoothstep(0.0, 0.9, length(p - res * 0.5) / (0.5 * length(res)));
+  return col * (1.0 - 0.35 * vign);
+}
+vec3 wallpaper(vec2 p) {
+  if (style > 1.5) return bubbles(p);
+  if (style > 0.5) return aurora(p);
+  return liquid(p);
+}
+</script>
+
+<script id="wallFs" type="x-shader">
+void main() { gl_FragColor = vec4(wallpaper(logical()), 1.0); }
+</script>
+
+<script id="copyFs" type="x-shader">
+uniform sampler2D image; uniform vec2 dst;
+void main() { gl_FragColor = vec4(texture2D(image, gl_FragCoord.xy / dst).rgb, 1.0); }
+</script>
+
+<!-- quarter-size backdrop, nine taps (as frontrow-gpu-scene.c BACKDROP_BLUR_FRAGMENT) -->
+<script id="blurFs" type="x-shader">
+uniform sampler2D image; uniform vec2 src;
+void main() {
+  vec2 c = gl_FragCoord.xy * 4.0; vec3 sum = vec3(0.0);
+  for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++)
+    sum += texture2D(image, (c + vec2(float(i), float(j)) * 12.0 * view.x) / src).rgb;
+  gl_FragColor = vec4(sum / 9.0, 1.0);
+}
+</script>
+
+<!-- GLASS_FRAGMENT from frontrow-gpu-scene.c, in logical px -->
+<script id="glassFs" type="x-shader">
+uniform vec4 rect; uniform float radius; uniform float bevel; uniform float refraction; uniform float alpha;
+uniform float tintAmount; uniform float margin;
+uniform sampler2D blurred; uniform sampler2D sharp;
+vec2 screenUv(vec2 p) { return vec2(p.x, res.y - p.y) / res; }
+vec3 frosted(vec2 p) { return 0.5 * (texture2D(blurred, screenUv(p + vec2(6.0, 5.0))).rgb + texture2D(blurred, screenUv(p - vec2(6.0, 5.0))).rgb); }
+vec3 seen(vec2 p, float edge) { vec3 f = frosted(p); return edge > 0.01 ? mix(f, texture2D(sharp, screenUv(p)).rgb, edge) : f; }
+void main() {
+  vec2 p = logical();
+  vec2 c = rect.xy + rect.zw * 0.5; vec2 dp = p - c;
+  vec2 q = abs(dp) - (rect.zw * 0.5 - radius);
+  float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+  float k = alpha;
+  if (d > 0.5) {
+    float drop = min(7.0, margin * 0.4);
+    vec2 qs = abs(dp - vec2(0.0, drop)) - (rect.zw * 0.5 - radius);
+    float s = length(max(qs, 0.0)) + min(max(qs.x, qs.y), 0.0) - radius;
+    float a = 0.32 * (1.0 - smoothstep(-4.0, margin - drop - 1.0, s)) * k;
+    if (a <= 0.003) discard;
+    gl_FragColor = vec4(0.0, 0.0, 0.0, a); return;
+  }
+  float e = -d; float b = 1.0 - clamp(e / bevel, 0.0, 1.0);
+  vec2 sgn = vec2(dp.x < 0.0 ? -1.0 : 1.0, dp.y < 0.0 ? -1.0 : 1.0);
+  vec2 n = sgn * ((q.x > 0.0 && q.y > 0.0) ? normalize(q) : (q.x > q.y ? vec2(1.0, 0.0) : vec2(0.0, 1.0)));
+  vec3 col;
+  if (b > 0.01) {
+    vec2 off = n * refraction * b * b * bevel; float edge = 0.55 * b * b;
+    vec3 c1 = seen(p + off * 0.94, edge); vec3 c2 = seen(p + off * 1.08, edge);
+    col = vec3(c1.r, 0.5 * (c1.g + c2.g), c2.b);
+  } else {
+    col = frosted(p);
+  }
+  col = mix(col, vec3(1.0), 0.12);
+  col = mix(col, tint * (0.75 + 0.35 * dot(col, vec3(0.333))), tintAmount);
+  col *= mix(1.0, 0.68, smoothstep(0.5, 0.95, dot(col, vec3(0.299, 0.587, 0.114))));
+  float top = 1.0 - clamp((p.y - rect.y) / rect.w, 0.0, 1.0);
+  col += vec3(0.06) * top * top;
+  float light = 0.5 + 0.5 * dot(n, normalize(vec2(-0.55, -0.85)));
+  col += vec3((1.0 - smoothstep(0.0, 1.8, e)) * (0.18 + 0.55 * light) + b * b * b * (0.10 + 0.22 * light));
+  float a = clamp(0.5 - d, 0.0, 1.0) * k;
+  if (a <= 0.0) discard;
+  gl_FragColor = vec4(min(col, 1.0), a);
+}
+</script>
+
+<script>
+'use strict';
+const canvas = document.getElementById('c');
+const hud = document.getElementById('hud');
+const panel = document.getElementById('panel');
+const labelsEl = document.getElementById('labels');
+const gl = canvas.getContext('webgl', { antialias: false, alpha: false, depth: false, stencil: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
+const DPR = window.devicePixelRatio || 1;
+
+function fail(msg) { hud.textContent = '错误: ' + msg; post({ error: msg, ua: navigator.userAgent }); throw new Error(msg); }
+if (!gl) fail('WebGL 不可用');
+
+const VS = 'attribute vec2 pos; uniform vec2 res; void main(){ gl_Position = vec4(pos.x / res.x * 2.0 - 1.0, 1.0 - pos.y / res.y * 2.0, 0.0, 1.0); }';
+const common = document.getElementById('common').textContent;
+function program(id) {
+  const p = gl.createProgram();
+  for (const [type, src] of [[gl.VERTEX_SHADER, VS], [gl.FRAGMENT_SHADER, common + document.getElementById(id).textContent]]) {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) fail(id + ': ' + gl.getShaderInfoLog(s));
+    gl.attachShader(p, s);
+  }
+  gl.bindAttribLocation(p, 0, 'pos'); gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) fail(id + ' link: ' + gl.getProgramInfoLog(p));
+  const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) { const name = gl.getActiveUniform(p, i).name; u[name] = gl.getUniformLocation(p, name); }
+  return { p, u };
+}
+const P = { wall: program('wallFs'), copy: program('copyFs'), blur: program('blurFs'), glass: program('glassFs') };
+
+const vbuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vbuf);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+const quadData = new Float32Array(8);
+function quad(x, y, w, h) {
+  quadData.set([x, y, x + w, y, x, y + h, x + w, y + h]);
+  gl.bufferData(gl.ARRAY_BUFFER, quadData, gl.STREAM_DRAW);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+function target(w, h) {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) fail('FBO incomplete ' + w + 'x' + h);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { tex, fbo, w, h };
+}
+function freeTarget(t) { if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); } }
+
+/* ---- state ---- */
+let W = 0, H = 0;                 // logical
+let cfg = { scale: 1, style: 0, animated: true, heavy: false };
+let T = {};                       // render targets
+let tiles = [];
+const TINT = [0.62, 0.40, 0.92];
+const t0 = performance.now();
+
+function layout() {
+  const m = 24, g = 16, cols = 4, rows = 3;
+  const cw = (W - 2 * m - (cols - 1) * g) / cols, ch = (H - 2 * m - (rows - 1) * g) / rows;
+  const cell = (c, r, cs, rs) => [m + c * (cw + g), m + r * (ch + g), cs * cw + (cs - 1) * g, rs * ch + (rs - 1) * g];
+  const base = [
+    { r: cell(0, 0, 2, 2), radius: 40, label: 'big' },
+    { r: cell(2, 0, 1, 1), radius: 32, label: 'clock' }, { r: cell(3, 0, 1, 1), radius: 32, label: 'Intercom' },
+    { r: cell(2, 1, 1, 1), radius: 32, label: 'Lights' }, { r: cell(3, 1, 1, 1), radius: 32, label: 'Fan' },
+    { r: cell(0, 2, 1, 1), radius: 32, label: 'Scene' }, { r: cell(1, 2, 1, 1), radius: 32, label: 'Lock' },
+    { r: cell(2, 2, 1, 1), radius: 32, label: 'Music' }, { r: cell(3, 2, 1, 1), radius: 32, label: 'Camera' },
+  ];
+  const extra = [];
+  if (cfg.heavy) {
+    // pills / buttons on top of the tiles: twice the overdraw, like an editor or player page
+    for (const tl of base) {
+      const [x, y, w, h] = tl.r;
+      extra.push({ r: [x + 14, y + h - 58, (w - 40) / 2, 44], radius: 22, tintAmount: 0.25 });
+      extra.push({ r: [x + 26 + (w - 40) / 2, y + h - 58, (w - 40) / 2, 44], radius: 22 });
+    }
+  }
+  tiles = base.concat(extra);
+  labelsEl.innerHTML = '';
+  for (const tl of base) {
+    const [x, y, w, h] = tl.r;
+    const d = document.createElement('div'); d.className = 'lbl';
+    Object.assign(d.style, { left: x + 'px', top: (y + h * 0.28) + 'px', width: w + 'px' });
+    if (tl.label === 'big') d.innerHTML = '<div style="font-size:' + Math.round(h * 0.38) + 'px;font-weight:200">21°</div><div style="font-size:18px">温控 · 客厅</div>';
+    else if (tl.label === 'clock') { d.id = 'clk'; d.style.fontSize = Math.round(h * 0.3) + 'px'; d.style.fontWeight = 300; }
+    else d.innerHTML = '<div style="font-size:30px">◉</div><div style="font-size:15px">' + tl.label + '</div>';
+    labelsEl.appendChild(d);
+  }
+}
+
+function setup() {
+  W = window.innerWidth || document.documentElement.clientWidth || 1024;
+  H = window.innerHeight || document.documentElement.clientHeight || 768;
+  const s = cfg.scale;
+  const dw = Math.round(W * s), dh = Math.round(H * s);
+  canvas.width = dw; canvas.height = dh;
+  for (const k in T) freeTarget(T[k]);
+  T = {
+    half: target(Math.max(1, dw >> 1), Math.max(1, dh >> 1)),
+    back: target(dw, dh),
+    small: target(Math.max(1, dw >> 2), Math.max(1, dh >> 2)),
+    wall: target(dw, dh),
+  };
+  T.wallValid = false;
+  layout();
+}
+
+function common_(pr, scaleDev, targetH, time) {
+  gl.useProgram(pr.p);
+  gl.uniform2f(pr.u.res, W, H);
+  gl.uniform2f(pr.u.view, scaleDev, targetH);
+  if (pr.u.tint) gl.uniform3fv(pr.u.tint, TINT);
+  if (pr.u.t) gl.uniform1f(pr.u.t, time);
+  if (pr.u['style']) gl.uniform1f(pr.u['style'], cfg.style);
+}
+function bindTarget(tg) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, tg ? tg.fbo : null);
+  gl.viewport(0, 0, tg ? tg.w : canvas.width, tg ? tg.h : canvas.height);
+}
+function copy(src, dst) {
+  bindTarget(dst);
+  const pr = P.copy; const dw = dst ? dst.w : canvas.width, dh = dst ? dst.h : canvas.height;
+  common_(pr, dw / W, dh, 0);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src.tex);
+  gl.uniform1i(pr.u.image, 0); gl.uniform2f(pr.u.dst, dw, dh);
+  quad(0, 0, W, H);
+}
+
+function render(now) {
+  const time = cfg.animated ? (now - t0) / 1000 * 4 : 7.0;
+  const s = cfg.scale, dw = canvas.width, dh = canvas.height;
+  gl.disable(gl.BLEND);
+  // 1. wallpaper: half size each frame while animated, else a cached full-size copy
+  if (cfg.animated) {
+    bindTarget(T.half); common_(P.wall, T.half.w / W, T.half.h, time); quad(0, 0, W, H);
+    copy(T.half, T.back);
+  } else {
+    if (!T.wallValid) { bindTarget(T.wall); common_(P.wall, s, dh, time); quad(0, 0, W, H); T.wallValid = true; }
+    copy(T.wall, T.back);
+  }
+  // 2. quarter-size blurred backdrop
+  bindTarget(T.small); common_(P.blur, T.small.w / W, T.small.h, time);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T.back.tex);
+  gl.uniform1i(P.blur.u.image, 0); gl.uniform2f(P.blur.u.src, dw, dh);
+  quad(0, 0, W, H);
+  // 3. backdrop to screen
+  copy(T.back, null);
+  // 4. glass tiles
+  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  const pr = P.glass; common_(pr, s, dh, time);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, T.small.tex);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, T.back.tex);
+  gl.uniform1i(pr.u.blurred, 1); gl.uniform1i(pr.u.sharp, 2);
+  gl.uniform1f(pr.u.refraction, 0.9); gl.uniform1f(pr.u.alpha, 1.0);
+  for (const tl of tiles) {
+    const [x, y, w, h] = tl.r;
+    const margin = Math.min(28, Math.max(6, Math.min(w, h) * 0.5));
+    gl.uniform4f(pr.u.rect, x, y, w, h);
+    gl.uniform1f(pr.u.radius, tl.radius);
+    gl.uniform1f(pr.u.bevel, Math.min(18, tl.radius * 0.6));
+    gl.uniform1f(pr.u.tintAmount, tl.tintAmount || 0);
+    gl.uniform1f(pr.u.margin, margin);
+    quad(x - margin, y - margin, w + 2 * margin, h + 2 * margin);
+  }
+}
+
+/* ---- benchmark ---- */
+const maxScale = Math.min(2, DPR);
+const SUITE = [
+  { name: '1x 流光 动态', scale: 1, style: 0, animated: true, heavy: false },
+  { name: '1.5x 流光 动态', scale: 1.5, style: 0, animated: true, heavy: false },
+  { name: '2x 流光 动态', scale: 2, style: 0, animated: true, heavy: false },
+  { name: '2x 流光 静态', scale: 2, style: 0, animated: false, heavy: false },
+  { name: '2x 气泡 动态', scale: 2, style: 2, animated: true, heavy: false },
+  { name: '2x 流光 动态 双层按钮', scale: 2, style: 0, animated: true, heavy: true },
+  { name: '1x 流光 动态 双层按钮', scale: 1, style: 0, animated: true, heavy: true },
+].filter(c => c.scale <= maxScale + 0.01);
+const WARM_MS = 1200, RUN_MS = 5000, SYNC_FRAMES = 24;
+const results = [];
+const px = new Uint8Array(4);
+
+function pct(a, p) { const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; }
+function median(a) { return pct(a, 0.5); }
+
+let idx = -1, phase = 'idle', phaseStart = 0, last = 0, gaps = [], syncMs = [], syncLeft = 0, cpuMs = [];
+
+function next(now) {
+  idx++;
+  if (idx >= SUITE.length) { phase = 'done'; finish(); return; }
+  cfg = Object.assign({}, SUITE[idx]); setup();
+  phase = 'warm'; phaseStart = now; gaps = []; syncMs = []; cpuMs = []; last = 0;
+}
+
+function frame(now) {
+  if (phase === 'done') return;
+  if (phase === 'idle') { next(now); }
+  const c0 = performance.now();
+  if (phase === 'sync') {
+    render(now); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    syncMs.push(performance.now() - c0);
+    if (--syncLeft <= 0) {
+      const fps = 1000 / (gaps.reduce((a, b) => a + b, 0) / gaps.length);
+      const r = { name: cfg.name, scale: cfg.scale, px: canvas.width + 'x' + canvas.height,
+        fps: +fps.toFixed(1), p50gap: +median(gaps).toFixed(1), p95gap: +pct(gaps, 0.95).toFixed(1),
+        dropped: gaps.filter(g => g > 25).length, frames: gaps.length,
+        cpuMs: +median(cpuMs).toFixed(2), syncMs: +median(syncMs).toFixed(1) };
+      results.push(r); post({ partial: r });
+      next(now);
+    }
+  } else {
+    render(now);
+    cpuMs.push(performance.now() - c0);
+    if (phase === 'run' && last) gaps.push(now - last);
+    last = now;
+    if (phase === 'warm' && now - phaseStart > WARM_MS) { phase = 'run'; phaseStart = now; }
+    else if (phase === 'run' && now - phaseStart > RUN_MS) { phase = 'sync'; syncLeft = SYNC_FRAMES; }
+  }
+  const clk = document.getElementById('clk');
+  if (clk) { const d = new Date(); clk.textContent = d.toTimeString().slice(0, 5); }
+  const recent = gaps.slice(-30);
+  const live = recent.length ? (1000 / (recent.reduce((a, b) => a + b, 0) / recent.length)).toFixed(0) : '–';
+  hud.textContent = `[${idx + 1}/${SUITE.length}] ${cfg.name}  ${phase}\n画布 ${canvas.width}x${canvas.height}  实时 ${live} fps\nDPR ${DPR}  逻辑 ${W}x${H}`;
+  requestAnimationFrame(frame);
+}
+
+function info() {
+  const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+  return { ua: navigator.userAgent, dpr: DPR, logical: [window.innerWidth, window.innerHeight],
+    renderer: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+    vendor: dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR),
+    maxTex: gl.getParameter(gl.MAX_TEXTURE_SIZE), standalone: !!navigator.standalone };
+}
+
+function post(body) {
+  try {
+    fetch('result', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ at: new Date().toISOString() }, body)) }).catch(() => {});
+  } catch (e) {}
+}
+
+function finish() {
+  const inf = info();
+  post({ final: results, info: inf });
+  let h = '<h2 style="margin:0">玻璃渲染帧率测试</h2><div>' + inf.renderer + ' · DPR ' + inf.dpr + ' · 逻辑 ' + inf.logical.join('x') + (inf.standalone ? ' · 全屏模式' : '') + '</div>';
+  h += '<table><tr><th>配置</th><th>画布</th><th>平均 fps</th><th>中位帧间隔</th><th>P95 帧间隔</th><th>掉帧 (&gt;25ms)</th><th>同步渲染耗时</th></tr>';
+  for (const r of results) h += `<tr><td>${r.name}</td><td>${r.px}</td><td>${r.fps}</td><td>${r.p50gap} ms</td><td>${r.p95gap} ms</td><td>${r.dropped}/${r.frames}</td><td>${r.syncMs} ms</td></tr>`;
+  h += '</table><div style="margin-top:8px;color:#aaa">结果已自动发回 Mac。“同步渲染耗时”是一帧画完到 GPU 完成的时间，低于 16.7 ms 才有余量跑 60 fps。</div>';
+  h += '<button onclick="location.reload()">再测一次</button>';
+  panel.innerHTML = h; panel.style.display = 'block';
+}
+
+post({ hello: info() });
+hud.textContent = '2 秒后开始，请保持屏幕不动…';
+setTimeout(() => requestAnimationFrame(frame), 2000);
+</script>
+</body></html>

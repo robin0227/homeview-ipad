@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Wake Word Test</title>
+<style>
+:root { --bg: #000; --card: #1c1c1e; --fg: #fff; --dim: #8e8e93; --ok: #30d158; --hit: #0a84ff; --bad: #ff453a; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); overflow: hidden;
+  font-family: -apple-system, "PingFang SC", system-ui, sans-serif; -webkit-user-select: none; user-select: none; }
+#wrap { display: grid; grid-template-columns: 1fr 360px; gap: 16px; padding: 20px; height: 100%; box-sizing: border-box; }
+#main { background: var(--card); border-radius: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  transition: background .25s; position: relative; }
+#main.hit { background: var(--hit); }
+#word { font-size: 64px; font-weight: 700; letter-spacing: 1px; }
+#hint { font-size: 20px; color: var(--dim); margin-top: 10px; text-align: center; line-height: 1.6; }
+#main.hit #hint { color: #fff; }
+#meter { position: absolute; left: 32px; right: 32px; bottom: 28px; height: 10px; background: #333; border-radius: 5px; overflow: hidden; }
+#bar { height: 100%; width: 0; background: var(--ok); }
+#side { background: var(--card); border-radius: 22px; padding: 16px; font: 13px/1.6 ui-monospace, Menlo, monospace; overflow: auto; }
+#side h3 { font: 600 16px -apple-system, system-ui; margin: 0 0 8px; }
+.kv { display: flex; justify-content: space-between; gap: 8px; }
+.kv b { font-weight: 600; }
+#hits { margin-top: 12px; color: var(--dim); white-space: pre-wrap; }
+a { color: var(--hit); }
+</style></head>
+<body>
+<div id="wrap">
+  <div id="main">
+    <div id="word">待机中</div>
+    <div id="hint">说 “homeview” / “hey homeview” 或 “你好小家”</div>
+    <div id="meter"><div id="bar"></div></div>
+  </div>
+  <div id="side">
+    <h3>唤醒词测试</h3>
+    <div id="stats"></div>
+    <div id="hits"></div>
+    <div style="margin-top:14px;font-family:-apple-system">其他页面：在 config.json 里设 "page": "ha" 或 "index"</div>
+  </div>
+</div>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const S = { status: '启动中', loadMs: null, vp: null, threshold: null, total: 0, byWord: {}, rtf: null, cpu: null, dropped: 0, audioMin: 0, thermal: null, battery: null, startedAt: Date.now() };
+const hitLines = [];
+
+function native(msg) { try { window.webkit.messageHandlers.native.postMessage(msg); return true; } catch (e) { return false; } }
+
+function render() {
+  const mins = ((Date.now() - S.startedAt) / 60000).toFixed(1);
+  const rows = [
+    ['状态', S.status], ['模型加载', S.loadMs == null ? '–' : S.loadMs + ' ms'], ['回声消除', S.vp || '–'],
+    ['配置', S.threshold == null ? '–' : S.threshold],
+    ['运行时长', mins + ' 分钟'], ['命中总数（各配置合计）', S.total],
+    ...Object.entries(S.byWord).map(([k, v]) => ['  ' + k, v]),
+    ['解码 RTF', S.rtf == null ? '–' : S.rtf], ['App CPU', S.cpu == null ? '–' : S.cpu + ' %'],
+    ['丢弃缓冲', S.dropped], ['温度状态', S.thermal == null ? '–' : S.thermal],
+    ['电量', S.battery == null || S.battery < 0 ? '–' : Math.round(S.battery * 100) + ' %'],
+  ];
+  $('stats').innerHTML = rows.map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`).join('');
+  $('hits').textContent = hitLines.join('\n');
+}
+
+window.onMicLevel = db => { $('bar').style.width = Math.max(0, Math.min(100, (db + 70) / 70 * 100)) + '%'; };
+window.onKwsStatus = s => {
+  if (s.error) { S.status = '错误：' + s.error; render(); return; }
+  S.status = '监听中'; S.vp = s.voiceProcessing;
+  const v = s.variants || [];
+  S.loadMs = v.map(x => x.name + ' ' + (x.error ? '失败' : x.loadMs)).join(' / ');
+  S.threshold = v.map(x => `${x.name}:${x.model === 'bundle' ? '中英' : x.model} ${x.threshold}`).join('<br>'); S.score = '';
+  for (const x of v) if (x.error) hitLines.unshift('变体 ' + x.name + ' 加载失败：' + x.error);
+  render();
+};
+let flashTimer;
+window.onKwsHit = e => {
+  S.total++; const key = (e.variant || '') + ' · ' + e.keyword; S.byWord[key] = (S.byWord[key] || 0) + 1;
+  hitLines.unshift(new Date().toTimeString().slice(0, 8) + '  ' + key); hitLines.length = Math.min(hitLines.length, 30);
+  $('word').textContent = e.keyword === 'HOMEVIEW' ? 'homeview' : e.keyword;
+  $('main').classList.add('hit');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { $('main').classList.remove('hit'); $('word').textContent = '待机中'; }, 1500);
+  render();
+};
+const rtfBy = {};
+window.onKwsStats = s => {
+  rtfBy[s.variant || '?'] = s.rtf; S.rtf = Object.entries(rtfBy).map(([k, v]) => k + ' ' + v).join(' / '); S.cpu = s.appCpuPct; S.dropped = s.dropped; S.thermal = s.thermal; S.battery = s.battery; render();
+};
+
+setInterval(render, 5000);
+render();
+if (!native({ cmd: 'kws_start' })) { S.status = '不在 App 内'; render(); }
+</script>
+</body></html>

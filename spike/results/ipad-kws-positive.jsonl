@@ -1,0 +1,53 @@
+{"screen": "(1536.0, 2048.0)", "scale": 2, "version": "0.3", "system": "15.8.8", "thermal": 0, "native_t": "2026-11-05T04:34:54Z", "event": "launch", "hasConfig": true, "model": "iPad", "memMB": 1988, "from": "ipad", "received": "2026-11-05T12:34:54"}
+{"inputs": ["iPad 麦克风"], "voiceProcessing": "on", "ioBuffer": 0.01600000075995922, "formatRate": 16000, "loadMs": 2289, "event": "kws_start", "score": 1.5, "native_t": "2026-11-05T04:34:57Z", "keywordsSource": "bundle", "keywords": ["HH OW1 M V Y UW1 @HOMEVIEW", "HH EY1 HH OW1 M V Y UW1 @HOMEVIEW", "HH OW1 M W Y UW1 @HOMEVIEW", "HH AO1 M V Y UW1 @HOMEVIEW", "n ǐ h ǎo x iǎo j iā @你好小家"], "channels": 1, "sessionRate": 16000, "threshold": 0.25, "from": "ipad", "received": "2026-11-05T12:34:58"}
+{"native_t": "2026-11-05T04:35:21Z", "keyword": "HOMEVIEW", "event": "kws_hit", "from": "ipad", "received": "2026-11-05T12:35:21"}
+{"event": "kws_hit", "native_t": "2026-11-05T04:35:25Z", "keyword": "HOMEVIEW", "from": "ipad", "received": "2026-11-05T12:35:25"}
+{"native_t": "2026-11-05T04:35:27Z", "dropped": 0, "appCpuPct": 21.9, "hits": 2, "rtf": 0.174, "thermal": 0, "battery": 0.550000011920929, "event": "kws_stats", "audioSec": 30, "from": "ipad", "received": "2026-11-05T12:35:28"}
+{"event": "kws_hit", "native_t": "2026-11-05T04:35:31Z", "keyword": "HOMEVIEW", "from": "ipad", "received": "2026-11-05T12:35:31"}
+{"keyword": "HOMEVIEW", "native_t": "2026-11-05T04:35:47Z", "event": "kws_hit", "from": "ipad", "received": "2026-11-05T12:35:48"}
+{"rtf": 0.181, "dropped": 0, "audioSec": 30, "battery": 0.550000011920929, "event": "kws_stats", "hits": 4, "thermal": 0, "native_t": "2026-11-05T04:35:57Z", "appCpuPct": 22.6, "from": "ipad", "received": "2026-11-05T12:35:58"}
+{"keyword": "HOMEVIEW", "event": "kws_hit", "native_t": "2026-11-05T04:36:03Z", "from": "ipad", "received": "2026-11-05T12:36:04"}
+{"native_t": "2026-11-05T04:36:06Z", "event": "kws_hit", "keyword": "HOMEVIEW", "from": "ipad", "received": "2026-11-05T12:36:07"}
+{"keyword": "HOMEVIEW", "native_t": "2026-11-05T04:36:14Z", "event": "kws_hit", "from": "ipad", "received": "2026-11-05T12:36:15"}
+{"native_t": "2026-11-05T04:36:26Z", "event": "kws_hit", "keyword": "你好小家", "from": "ipad", "received": "2026-11-05T12:36:26"}
+{"hits": 8, "battery": 0.550000011920929, "native_t": "2026-11-05T04:36:27Z", "audioSec": 30, "appCpuPct": 21.7, "rtf": 0.17, "dropped": 0, "event": "kws_stats", "thermal": 0, "from": "ipad", "received": "2026-11-05T12:36:28"}
+{"keyword": "你好小家", "event": "kws_hit", "native_t": "2026-11-05T04:36:29Z", "from": "ipad", "received": "2026-11-05T12:36:29"}
+{"event": "kws_hit", "keyword": "你好小家", "native_t": "2026-11-05T04:36:32Z", "from": "ipad", "received": "2026-11-05T12:36:33"}
+{"keyword": "你好小家", "native_t": "2026-11-05T04:36:35Z", "event": "kws_hit", "from": "ipad", "received": "2026-11-05T12:36:36"}
+{"keyword": "你好小家", "event": "kws_hit", "native_t": "2026-11-05T04:36:38Z", "from": "ipad", "received": "2026-11-05T12:36:38"}
+{"event": "kws_hit", "keyword": "你好小家", "native_t": "2026-11-05T04:36:40Z", "from": "ipad", "received": "2026-11-05T12:36:41"}
+{"keyword": "你好小家", "event": "kws_hit", "native_t": "2026-11-05T04:36:43Z", "from": "ipad", "received": "2026-11-05T12:36:44"}
+{"native_t": "2026-11-05T04:36:46Z", "keyword": "你好小家", "event": "kws_hit", "from": "ipad", "received": "2026-11-05T12:36:47"}
+{"native_t": "2026-11-05T04:36:48Z", "event": "kws_hit", "keyword": "你好小家", "from": "ipad", "received": "2026-11-05T12:36:49"}
+{"keyword": "你好小家", "native_t": "2026-11-05T04:36:52Z", "event": "kws_hit", "from": "ipad", "received": "2026-11-05T12:36:53"}
+{"appCpuPct": 22.2, "event": "kws_stats", "audioSec": 30, "rtf": 0.165, "dropped": 0, "thermal": 0, "battery": 0.5600000023841858, "hits": 17, "native_t": "2026-11-05T04:36:57Z", "from": "ipad", "received": "2026-11-05T12:36:58"}
+{"event": "kws_hit", "keyword": "HOMEVIEW", "native_t": "2026-11-05T04:37:00Z", "from": "ipad", "received": "2026-11-05T12:37:00"}
+{"native_t": "2026-11-05T04:37:08Z", "event": "kws_hit", "keyword": "HOMEVIEW", "from": "ipad", "received": "2026-11-05T12:37:09"}
+{"native_t": "2026-11-05T04:37:20Z", "event": "kws_hit", "keyword": "HOMEVIEW", "from": "ipad", "received": "2026-11-05T12:37:21"}
+{"hits": 20, "rtf": 0.18, "dropped": 0, "audioSec": 30, "appCpuPct": 23, "thermal": 0, "event": "kws_stats", "battery": 0.5600000023841858, "native_t": "2026-11-05T04:37:27Z", "from": "ipad", "received": "2026-11-05T12:37:28"}
+{"keyword": "HOMEVIEW", "native_t": "2026-11-05T04:37:38Z", "event": "kws_hit", "from": "ipad", "received": "2026-11-05T12:37:39"}
+{"keyword": "HOMEVIEW", "native_t": "2026-11-05T04:37:40Z", "event": "kws_hit", "from": "ipad", "received": "2026-11-05T12:37:41"}
+{"keyword": "HOMEVIEW", "native_t": "2026-11-05T04:37:45Z", "event": "kws_hit", "from": "ipad", "received": "2026-11-05T12:37:46"}
+{"native_t": "2026-11-05T04:37:50Z", "keyword": "你好小家", "event": "kws_hit", "from": "ipad", "received": "2026-11-05T12:37:51"}
+{"native_t": "2026-11-05T04:37:53Z", "keyword": "你好小家", "event": "kws_hit", "from": "ipad", "received": "2026-11-05T12:37:54"}
+{"keyword": "你好小家", "native_t": "2026-11-05T04:37:56Z", "event": "kws_hit", "from": "ipad", "received": "2026-11-05T12:37:57"}
+{"hits": 26, "battery": 0.5600000023841858, "audioSec": 30, "native_t": "2026-11-05T04:37:57Z", "appCpuPct": 22.7, "thermal": 0, "rtf": 0.171, "event": "kws_stats", "dropped": 0, "from": "ipad", "received": "2026-11-05T12:37:58"}
+{"event": "kws_hit", "native_t": "2026-11-05T04:37:59Z", "keyword": "你好小家", "from": "ipad", "received": "2026-11-05T12:38:00"}
+{"event": "kws_hit", "native_t": "2026-11-05T04:38:02Z", "keyword": "你好小家", "from": "ipad", "received": "2026-11-05T12:38:02"}
+{"keyword": "你好小家", "event": "kws_hit", "native_t": "2026-11-05T04:38:05Z", "from": "ipad", "received": "2026-11-05T12:38:05"}
+{"keyword": "你好小家", "event": "kws_hit", "native_t": "2026-11-05T04:38:07Z", "from": "ipad", "received": "2026-11-05T12:38:07"}
+{"native_t": "2026-11-05T04:38:09Z", "keyword": "你好小家", "event": "kws_hit", "from": "ipad", "received": "2026-11-05T12:38:09"}
+{"event": "kws_hit", "native_t": "2026-11-05T04:38:11Z", "keyword": "你好小家", "from": "ipad", "received": "2026-11-05T12:38:12"}
+{"event": "kws_hit", "native_t": "2026-11-05T04:38:13Z", "keyword": "你好小家", "from": "ipad", "received": "2026-11-05T12:38:14"}
+{"dropped": 0, "native_t": "2026-11-05T04:38:27Z", "hits": 33, "rtf": 0.162, "audioSec": 30, "event": "kws_stats", "thermal": 0, "appCpuPct": 21.6, "battery": 0.5600000023841858, "from": "ipad", "received": "2026-11-05T12:38:28"}
+{"rtf": 0.184, "hits": 33, "event": "kws_stats", "appCpuPct": 23.2, "dropped": 0, "audioSec": 30, "battery": 0.5600000023841858, "native_t": "2026-11-05T04:38:57Z", "thermal": 0, "from": "ipad", "received": "2026-11-05T12:38:58"}
+{"native_t": "2026-11-05T04:39:21Z", "keyword": "你好小家", "event": "kws_hit", "from": "ipad", "received": "2026-11-05T12:39:21"}
+{"event": "kws_hit", "keyword": "你好小家", "native_t": "2026-11-05T04:39:25Z", "from": "ipad", "received": "2026-11-05T12:39:26"}
+{"rtf": 0.179, "dropped": 0, "thermal": 0, "battery": 0.5699999928474426, "event": "kws_stats", "native_t": "2026-11-05T04:39:27Z", "audioSec": 30, "hits": 35, "appCpuPct": 23, "from": "ipad", "received": "2026-11-05T12:39:28"}
+{"keyword": "你好小家", "event": "kws_hit", "native_t": "2026-11-05T04:39:28Z", "from": "ipad", "received": "2026-11-05T12:39:29"}
+{"event": "kws_hit", "native_t": "2026-11-05T04:39:30Z", "keyword": "你好小家", "from": "ipad", "received": "2026-11-05T12:39:31"}
+{"event": "kws_hit", "native_t": "2026-11-05T04:39:33Z", "keyword": "你好小家", "from": "ipad", "received": "2026-11-05T12:39:34"}
+{"event": "kws_hit", "keyword": "你好小家", "native_t": "2026-11-05T04:39:38Z", "from": "ipad", "received": "2026-11-05T12:39:38"}
+{"native_t": "2026-11-05T04:39:40Z", "event": "kws_hit", "keyword": "你好小家", "from": "ipad", "received": "2026-11-05T12:39:41"}
+{"event": "kws_hit", "native_t": "2026-11-05T04:39:42Z", "keyword": "你好小家", "from": "ipad", "received": "2026-11-05T12:39:43"}
+{"rtf": 0.171, "dropped": 0, "audioSec": 30, "battery": 0.5699999928474426, "event": "kws_stats", "hits": 41, "thermal": 0, "native_t": "2026-11-05T04:39:57Z", "appCpuPct": 22.3, "from": "ipad", "received": "2026-11-05T12:39:58"}

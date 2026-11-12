@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>HA Link Test</title>
+<style>
+:root { --bg: #000; --card: #1c1c1e; --card-on: #f5c542; --fg: #fff; --dim: #8e8e93; --ok: #30d158; --bad: #ff453a; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); overflow: hidden;
+  font-family: -apple-system, "PingFang SC", system-ui, sans-serif; -webkit-user-select: none; user-select: none; }
+#wrap { display: grid; grid-template-columns: 1fr 340px; gap: 16px; padding: 20px; height: 100%; box-sizing: border-box; }
+#tiles { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 120px; gap: 12px; align-content: start; overflow: auto; }
+.tile { background: var(--card); border-radius: 22px; padding: 14px; box-sizing: border-box; display: flex; flex-direction: column;
+  justify-content: space-between; transition: transform .12s, background .2s; -webkit-tap-highlight-color: transparent; }
+.tile:active { transform: scale(.96); }
+.tile.on { background: var(--card-on); color: #000; }
+.tile.off-line { opacity: .4; }
+.tile .name { font-size: 15px; font-weight: 600; line-height: 1.2; }
+.tile .state { font-size: 13px; color: inherit; opacity: .7; }
+.tile .lat { font-size: 11px; opacity: .6; font-variant-numeric: tabular-nums; }
+.cam { grid-column: span 2; grid-row: span 2; padding: 0; overflow: hidden; position: relative; background: #111; }
+.cam img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cam .cap { position: absolute; left: 12px; bottom: 10px; font-size: 13px; text-shadow: 0 1px 3px #000; }
+.wide { grid-column: span 2; }
+#side { background: var(--card); border-radius: 22px; padding: 16px; font: 12px/1.5 ui-monospace, Menlo, monospace; overflow: auto; }
+#side h3 { font: 600 15px -apple-system, system-ui; margin: 0 0 8px; }
+.kv { display: flex; justify-content: space-between; gap: 8px; }
+.kv b { font-weight: 600; }
+.good { color: var(--ok); } .badc { color: var(--bad); }
+#log { margin-top: 10px; color: var(--dim); white-space: pre-wrap; word-break: break-all; }
+</style></head>
+<body>
+<div id="wrap">
+  <div id="tiles"></div>
+  <div id="side">
+    <h3>HA 连接测试</h3>
+    <div id="stats"></div>
+    <div id="log"></div>
+  </div>
+</div>
+<script>
+'use strict';
+const CFG = window.HV_CONFIG || {};
+const $ = id => document.getElementById(id);
+const S = { status: '未连接', connectMs: null, authMs: null, statesMs: null, entities: 0, events: 0, eventsSince: 0,
+  pings: [], toggles: [], camLoads: [], reconnects: 0 };
+const logLines = [];
+
+function native(msg) { try { window.webkit.messageHandlers.native.postMessage(msg); return true; } catch (e) { return false; } }
+function post(body) { native({ cmd: 'log', body: Object.assign({ at: new Date().toISOString(), page: 'ha' }, body) }); }
+function log(s) { logLines.unshift(new Date().toTimeString().slice(0, 8) + ' ' + s); logLines.length = Math.min(logLines.length, 40); $('log').textContent = logLines.join('\n'); }
+function med(a) { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; }
+function ms(v) { return v == null ? '–' : Math.round(v) + ' ms'; }
+
+function renderStats() {
+  const evRate = S.eventsSince ? (S.events / ((performance.now() - S.eventsSince) / 60000)).toFixed(0) : '–';
+  const rows = [
+    ['状态', `<span class="${S.status === '已连接' ? 'good' : 'badc'}">${S.status}</span>`],
+    ['HA 版本', S.version || '–'],
+    ['建立连接', ms(S.connectMs)], ['鉴权完成', ms(S.authMs)],
+    ['拉取全部状态', ms(S.statesMs) + ` (${S.entities})`],
+    ['ping 中位 RTT', ms(med(S.pings))], ['ping 次数', S.pings.length],
+    ['控制→回执 中位', ms(med(S.toggles.map(t => t.ack)))],
+    ['控制→状态变化 中位', ms(med(S.toggles.filter(t => t.state != null).map(t => t.state)))],
+    ['摄像头截图 中位', ms(med(S.camLoads))],
+    ['状态事件/分钟', evRate], ['重连次数', S.reconnects],
+  ];
+  $('stats').innerHTML = rows.map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`).join('');
+}
+
+/* ---- websocket ---- */
+let ws, nextId = 1, pending = {}, states = {}, pingTimer;
+function send(msg) { const id = nextId++; msg.id = id; ws.send(JSON.stringify(msg)); return new Promise(res => { pending[id] = { res, t: performance.now() }; }); }
+
+function connect() {
+  if (!CFG.ha_url || !CFG.token) { S.status = '缺少 config.json'; renderStats(); log('Documents/config.json 里没有 ha_url / token'); post({ event: 'ha_no_config' }); return; }
+  const url = CFG.ha_url.replace(/^http/, 'ws') + '/api/websocket';
+  const t0 = performance.now();
+  S.status = '连接中'; renderStats();
+  ws = new WebSocket(url);
+  ws.onopen = () => { S.connectMs = performance.now() - t0; log('socket open'); };
+  ws.onclose = e => {
+    S.status = '断开 ' + e.code; renderStats(); log('closed ' + e.code); clearInterval(pingTimer);
+    post({ event: 'ha_closed', code: e.code });
+    S.reconnects++; setTimeout(connect, 3000);
+  };
+  ws.onerror = () => log('socket error');
+  ws.onmessage = ev => {
+    const m = JSON.parse(ev.data);
+    if (m.type === 'auth_required') { S.version = m.ha_version; ws.send(JSON.stringify({ type: 'auth', access_token: CFG.token })); return; }
+    if (m.type === 'auth_invalid') { S.status = '令牌无效'; renderStats(); log('auth_invalid'); post({ event: 'ha_auth_invalid' }); return; }
+    if (m.type === 'auth_ok') { S.authMs = performance.now() - t0; S.status = '已连接'; log('auth ok, HA ' + m.ha_version); afterAuth(); return; }
+    if (m.type === 'event' && m.event && m.event.event_type === 'state_changed') { onStateChanged(m.event.data); return; }
+    const p = pending[m.id];
+    if (p) { delete pending[m.id]; p.res(Object.assign(m, { rtt: performance.now() - p.t })); }
+  };
+}
+
+async function afterAuth() {
+  const t = performance.now();
+  const r = await send({ type: 'get_states' });
+  S.statesMs = performance.now() - t;
+  S.entities = r.result.length;
+  for (const e of r.result) states[e.entity_id] = e;
+  log(`get_states ${r.result.length} 个实体 ${Math.round(S.statesMs)} ms`);
+  await send({ type: 'subscribe_events', event_type: 'state_changed' });
+  S.events = 0; S.eventsSince = performance.now();
+  buildTiles(); renderStats();
+  post({ event: 'ha_connected', version: S.version, connectMs: Math.round(S.connectMs), authMs: Math.round(S.authMs), statesMs: Math.round(S.statesMs), entities: S.entities });
+  pingTimer = setInterval(async () => { const p = await send({ type: 'ping' }); S.pings.push(p.rtt); if (S.pings.length > 200) S.pings.shift(); renderStats(); }, 3000);
+}
+
+/* ---- tiles ---- */
+const waiting = {};    // entity_id -> { t, rec }
+function friendly(e) { return (e.attributes.friendly_name || e.entity_id).replace(/\s+/g, ' ').trim(); }
+
+function buildTiles() {
+  const el = $('tiles'); el.innerHTML = '';
+  for (const cam of ['camera.living_room', 'camera.kitchen']) if (states[cam]) el.appendChild(camTile(cam));
+  const th = Object.values(states).find(e => /temperature/.test(e.entity_id) && /miaomiaoc/.test(e.entity_id));
+  const hu = Object.values(states).find(e => /humidi/.test(e.entity_id) && /miaomiaoc/.test(e.entity_id));
+  const w = Object.values(states).find(e => e.entity_id.startsWith('weather.'));
+  if (th) el.appendChild(infoTile('室内', `${th.state}° · ${hu ? hu.state + '%' : ''}`, th.entity_id, hu && hu.entity_id));
+  if (w) el.appendChild(infoTile('室外', `${w.attributes.temperature}° · ${w.state}`, w.entity_id));
+  const lights = Object.values(states).filter(e => e.entity_id.startsWith('light.') && !/indicator/.test(e.entity_id));
+  for (const e of lights) el.appendChild(lightTile(e));
+}
+
+function infoTile(title, text, ...ids) {
+  const d = document.createElement('div'); d.className = 'tile';
+  d.innerHTML = `<div class="name">${title}</div><div class="state" style="font-size:22px;opacity:1">${text}</div>`;
+  d.dataset.info = ids.filter(Boolean).join(',');
+  return d;
+}
+
+function lightTile(e) {
+  const d = document.createElement('div');
+  d.className = 'tile'; d.id = 'tile-' + e.entity_id;
+  d.innerHTML = `<div class="name">${friendly(e)}</div><div><div class="state"></div><div class="lat"></div></div>`;
+  paintLight(d, e);
+  d.onclick = () => toggle(e.entity_id, d);
+  return d;
+}
+function paintLight(d, e) {
+  d.classList.toggle('on', e.state === 'on');
+  d.classList.toggle('off-line', e.state === 'unavailable');
+  d.querySelector('.state').textContent = e.state === 'on' ? ('开' + (e.attributes.brightness ? ' · ' + Math.round(e.attributes.brightness / 2.55) + '%' : '')) : e.state === 'off' ? '关' : '离线';
+}
+
+async function toggle(id, d) {
+  if (!states[id] || states[id].state === 'unavailable') return;
+  const rec = { entity: id, ack: null, state: null };
+  waiting[id] = { t: performance.now(), rec };
+  d.querySelector('.lat').textContent = '…';
+  const r = await send({ type: 'call_service', domain: 'light', service: 'toggle', target: { entity_id: id } });
+  rec.ack = r.rtt; rec.ok = r.success;
+  S.toggles.push(rec); renderStats();
+  d.querySelector('.lat').textContent = `回执 ${Math.round(r.rtt)} ms`;
+  log(`${friendly(states[id])} toggle 回执 ${Math.round(r.rtt)} ms ${r.success ? '' : JSON.stringify(r.error)}`);
+  setTimeout(() => { if (waiting[id] && waiting[id].rec === rec) { delete waiting[id]; post({ event: 'ha_toggle', ...rec, note: 'no state change in 10s' }); } }, 10000);
+}
+
+function onStateChanged(data) {
+  S.events++;
+  const e = data.new_state; if (!e) return;
+  states[e.entity_id] = e;
+  const w = waiting[e.entity_id];
+  if (w) {
+    w.rec.state = performance.now() - w.t; delete waiting[e.entity_id];
+    const d = $('tile-' + e.entity_id);
+    if (d) d.querySelector('.lat').textContent = `回执 ${Math.round(w.rec.ack || 0)} · 状态 ${Math.round(w.rec.state)} ms`;
+    log(`${friendly(e)} → ${e.state}，状态变化 ${Math.round(w.rec.state)} ms`);
+    post({ event: 'ha_toggle', entity: e.entity_id, ack: Math.round(w.rec.ack || 0), state: Math.round(w.rec.state), newState: e.state });
+  }
+  const d = $('tile-' + e.entity_id); if (d) paintLight(d, e);
+  renderStats();
+}
+
+/* ---- cameras: entity_picture carries a short-lived token, so a plain <img> works (no CORS) ---- */
+function camTile(id) {
+  const d = document.createElement('div'); d.className = 'tile cam';
+  d.innerHTML = `<img alt=""><div class="cap">${friendly(states[id])}</div>`;
+  const img = d.querySelector('img');
+  const load = () => {
+    const pic = states[id] && states[id].attributes.entity_picture; if (!pic) return;
+    const t = performance.now();
+    const probe = new Image();
+    probe.onload = () => { const dt = performance.now() - t; S.camLoads.push(dt); if (S.camLoads.length > 50) S.camLoads.shift(); img.src = probe.src; d.querySelector('.cap').textContent = `${friendly(states[id])} · ${Math.round(dt)} ms`; renderStats(); };
+    probe.onerror = () => log(id + ' 截图失败');
+    probe.src = CFG.ha_url + pic + (pic.includes('?') ? '&' : '?') + '_=' + Date.now();
+  };
+  load(); setInterval(load, 10000);
+  return d;
+}
+
+setInterval(() => {
+  post({ event: 'ha_summary', status: S.status, pingMed: Math.round(med(S.pings) || 0), pings: S.pings.length,
+    toggleAckMed: Math.round(med(S.toggles.map(t => t.ack)) || 0), toggleStateMed: Math.round(med(S.toggles.filter(t => t.state != null).map(t => t.state)) || 0),
+    toggles: S.toggles.length, camMed: Math.round(med(S.camLoads) || 0), camLoads: S.camLoads.length, events: S.events, reconnects: S.reconnects });
+}, 30000);
+
+renderStats();
+post({ event: 'ha_page_loaded', hasConfig: !!(CFG.ha_url && CFG.token) });
+connect();
+</script>
+</body></html>

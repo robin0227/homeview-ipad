@@ -1,0 +1,109 @@
+{
+  "ha_url": "http://homeassistant.local:8123",
+  "render_scale": 1.25,
+  "wallpaper": {
+    "style": 2,
+    "tint": [
+      0.82,
+      0.72,
+      0.58
+    ],
+    "animated": true,
+    "speed": 1
+  },
+  "home": [
+    {
+      "type": "clock",
+      "at": [
+        0,
+        0,
+        2,
+        2
+      ]
+    },
+    {
+      "type": "weather",
+      "entity": "weather.forecast_home",
+      "at": [
+        2,
+        0
+      ]
+    },
+    {
+      "type": "climate",
+      "name": "客厅",
+      "temperature": "sensor.living_room_temperature",
+      "humidity": "sensor.living_room_humidity",
+      "at": [
+        3,
+        0
+      ]
+    },
+    {
+      "type": "light",
+      "entity": "light.bedroom_left",
+      "name": "左灯",
+      "room": "卧室",
+      "at": [
+        2,
+        1
+      ]
+    },
+    {
+      "type": "light",
+      "entity": "light.bedroom_right",
+      "name": "右灯",
+      "room": "卧室",
+      "at": [
+        3,
+        1
+      ]
+    },
+    {
+      "type": "light",
+      "entity": "light.reading_lamp",
+      "name": "书灯",
+      "room": "客厅",
+      "at": [
+        0,
+        2
+      ]
+    },
+    {
+      "type": "light",
+      "entity": "light.desk_lamp",
+      "name": "台灯",
+      "room": "客厅",
+      "at": [
+        1,
+        2
+      ]
+    },
+    {
+      "type": "light",
+      "entity": "light.ambient_usb",
+      "name": "氛围灯",
+      "room": "客厅",
+      "at": [
+        2,
+        2
+      ]
+    },
+    {
+      "type": "light",
+      "entity": "light.color_bulb",
+      "name": "彩光灯",
+      "room": "客厅",
+      "at": [
+        3,
+        2
+      ]
+    }
+  ],
+  "night": {
+    "start": "00:00",
+    "end": "07:00",
+    "brightness": 0.15,
+    "day_brightness": 0.6
+  }
+}
