@@ -154,7 +154,9 @@
   Faces.prototype.numeral = function (name, text, box, opts) {
     const f = this.face(), page = this.page, ctx = this.ctx;
     opts = opts || {};
-    const size = opts.size || box.h * 0.9, weight = opts.weight || 600, sx = opts.sx || 1;
+    const weight = opts.weight || 600, sx = opts.sx || 1;
+    // Shrink the glyphs when the text is wider than its box (e.g. "10:46" vs "1:11"), so nothing is cut off.
+    const baseSize = opts.size || box.h * 0.9, size = fitSize(text, baseSize, weight, sx, box.w);
     let part = this.parts[name];
     if (!part) {
       part = { el: document.createElement('div'), items: [] };
@@ -166,6 +168,7 @@
     }
     if (part.text === text) return;
     part.text = text;
+    part.el.style.fontSize = size + 'px';
     const style = !ctx.glass ? 'solid' : f.numerals;
     part.el.textContent = style === 'solid' ? text : '';
     for (const it of part.items) { const i = page.texts.indexOf(it); if (i >= 0) page.texts.splice(i, 1); }
@@ -178,7 +181,7 @@
       // capsule digits: as tall as the box allows (they read smaller than glyphs of the same size),
       // but no wider than the box; they keep their proportions (no squeeze, as on FrontRow)
       const widthPerH = bubbleWidthPerHeight(text);
-      let digitH = Math.min(box.h * 0.94, size * 0.95, (box.w * 1.04) / widthPerH);
+      let digitH = Math.min(box.h * 0.94, baseSize * 0.95, (box.w * 1.04) / widthPerH);
       if (sx < 1) digitH *= 0.86;
       for (const r of bubbleLayout(text, box.x + box.w / 2, box.y + (box.h - digitH) / 2, digitH, 1)) {
         part.items.push({ rect: r, r: r.r, fill: this.look.rgb, tintAmount: solidBg ? Math.max(amount, 0.35) : amount });
@@ -200,6 +203,16 @@
     part.items = [{ rect: box, mask, fill: this.look.rgb, tintAmount: amount }];
     page.texts.push(...part.items);
   };
+
+  /** Largest font size <= size at which `text` (squeezed by sx) fits in width w, leaving room for the glass edge. */
+  let measureCtx = null;
+  function fitSize(text, size, weight, sx, w) {
+    measureCtx = measureCtx || document.createElement('canvas').getContext('2d');
+    measureCtx.font = weight + ' ' + size + 'px ' + FONT;
+    const width = measureCtx.measureText(text).width * sx;
+    const room = w - 2 * Math.max(3, size / 40) - size * 0.04;
+    return width > room ? Math.floor(size * room / width) : size;
+  }
 
   // ---- capsule digits (FrontRow bubbleShapes): each glyph in a 100 x 180 box ---------------------
   const BUBBLE_S = 46;
