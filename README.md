@@ -12,6 +12,29 @@
 
 > 需要已越狱（Dopamine）并装好 TrollStore 的 iPad，系统为 iPadOS 15。本项目和 Apple 没有任何关系，“HomeView”只是用来描述界面风格。
 
+## 截图
+
+<table>
+  <tr>
+    <td><img src="docs/images/face-info.jpg" alt="信息表盘"><br><sub>信息表盘 · 光环背景</sub></td>
+    <td><img src="docs/images/face-bignum.jpg" alt="数字指针表盘"><br><sub>数字·指针表盘 · 弥散背景</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/face-widgets.jpg" alt="小组件表盘"><br><sub>小组件表盘 · 玻璃数字</sub></td>
+    <td><img src="docs/images/face-bubble.jpg" alt="气泡数字表盘"><br><sub>大数字表盘 · 气泡数字 · 极光背景</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/home.jpg" alt="主页"><br><sub>主页 · 直连 Home Assistant</sub></td>
+    <td><img src="docs/images/weather.jpg" alt="天气"><br><sub>天气 · 逐小时和 6 日预报</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/gallery.jpg" alt="表盘库"><br><sub>长按进入表盘库：9 种背景 · 4 种数字 · 18 种配色</sub></td>
+    <td align="center"><img src="docs/images/home-portrait.jpg" alt="竖屏主页" width="72%"><br><sub>竖屏自适应</sub></td>
+  </tr>
+</table>
+
+<sub>截图由同一套网页在 Mac 上用 Chrome 渲染（2x），连接真实的 Home Assistant 数据；在 iPad 上的效果和截图一致。</sub>
+
 ## 目录
 
 | 路径 | 内容 |
